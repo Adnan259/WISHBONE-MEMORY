@@ -20,12 +20,12 @@ WAVE_TCL := $(BUILD_DIR)/wave.tcl
 # Source lists
 # ------------------------------------------------------------
 ALL_SRCS := \
-    interface/wb_if.sv            \
-    souorce/dual_port_mem.sv      \
-    souorce/mem.sv                \
-    souorce/wishbone_mem_ctrlr.sv \
-    souorce/wb_mem.sv             \
-    vip/wb/wb.svh                 \
+    interface/wb_if.sv           \
+    source/dual_port_mem.sv      \
+    source/mem.sv                \
+    source/wishbone_mem_ctrlr.sv \
+    source/wb_mem.sv             \
+    vip/wb/wb.svh                \
     testbench/wb_mem_vip_tb.sv
 
 # Absolute repo root

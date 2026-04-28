@@ -17,7 +17,7 @@ WISHBONE-MEMORY/
 ├── Makefile                      # Vivado XSim build + simulation automation
 ├── interface/
 │   └── wb_if.sv                  # WISHBONE SystemVerilog interface with bus tasks
-├── souorce/
+├── source/
 │   ├── wb_mem.sv                 # Top-level DUT (controller + memory instantiation)
 │   ├── wishbone_mem_ctrlr.sv     # WISHBONE B.3 protocol controller (ACK, write-enable)
 │   ├── mem.sv                    # Memory wrapper (single-port view over dual-port RAM)
