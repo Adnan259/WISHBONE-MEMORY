@@ -58,7 +58,9 @@ module wb_vip_tb;
     wb_driver  #(ADDR_WIDTH, DATA_WIDTH) dvr;
     wb_monitor #(ADDR_WIDTH, DATA_WIDTH) mon;
     wb_scoreboard                        scb;
+    wb_coverage                          cov;
     mailbox #(wb_rsp_item)               rsp_mbx;
+    mailbox #(wb_rsp_item)               cov_mbx;
 
     // -------------------------------------------------------
     // Tasks
@@ -114,6 +116,38 @@ module wb_vip_tb;
         repeat(20) @(posedge clk_i);
     endtask
 
+
+    task automatic do_tx_fast(
+        input bit           is_write,
+        input logic [15:0]  addr
+    );
+        automatic wb_seq_item item = new();
+        item.cfg.ADDR_WIDTH = ADDR_WIDTH;
+        item.cfg.DATA_WIDTH = DATA_WIDTH;
+        void'(item.randomize() with {
+            is_write == local::is_write;
+            addr     == local::addr;
+        });
+        dvr.seq_mbx.put(item);
+        repeat(6) @(posedge clk_i);
+    endtask
+
+    task automatic do_tx_sel_fast(
+        input logic [15:0]  addr,
+        input logic [3:0]   sel
+    );
+        automatic wb_seq_item item = new();
+        item.cfg.ADDR_WIDTH = ADDR_WIDTH;
+        item.cfg.DATA_WIDTH = DATA_WIDTH;
+        void'(item.randomize() with {
+            is_write == 1;
+            addr     == local::addr;
+        });
+        item.sel[3:0] = sel;
+        dvr.seq_mbx.put(item);
+        repeat(6) @(posedge clk_i);
+    endtask
+
     // -------------------------------------------------------
     // Main
     // -------------------------------------------------------
@@ -122,15 +156,19 @@ module wb_vip_tb;
         dvr     = new();
         mon     = new();
         scb     = new();
+        cov     = new();
         rsp_mbx = new();
+        cov_mbx = new();
 
         dvr.connect_interface(intf);
         mon.connect_interface(intf);
         mon.connect_mailbox(rsp_mbx);
+        mon.connect_cov_mailbox(cov_mbx);
         scb.connect_mailbox(rsp_mbx);
+        cov.connect_mailbox(cov_mbx);
 
         clk_i = 0;
-        rst_i = 0;
+        rst_i = 1;
 
         start_clock();
         apply_reset();
@@ -139,6 +177,7 @@ module wb_vip_tb;
             dvr.run();
             mon.run();
             scb.run();
+            cov.run();
         join_none
 
         repeat(5) @(posedge clk_i);
@@ -325,10 +364,56 @@ module wb_vip_tb;
         do_tx_sel(16'h003C, 4'b1111);
         do_tx(0,  16'h003C);
 
+
+        // ====================================================
+        // TC16 — Coverage Closure & Constrained-Random Stress
+        // ====================================================
+        $display("\n--- TC16: Coverage closure sweep + constrained-random stress ---");
+        begin
+            automatic logic [15:0] reg_addrs[5] = '{
+                16'h0000, 16'h1000, 16'h8000, 16'hD000, 16'hFFFC
+            };
+            automatic logic [3:0] cat_sels[4] = '{
+                4'b0000, 4'b0001, 4'b0110, 4'b1111
+            };
+
+            // 1. Exhaustive 16-pattern byte-strobe sweep
+            for (int s = 0; s < 16; s++) begin
+                do_tx_sel_fast(16'h0200 + (s * 4), s[3:0]);
+                do_tx_fast(0,  16'h0200 + (s * 4));
+            end
+
+            // 2. All address regions x strobe categories + readback
+            foreach (reg_addrs[r]) begin
+                foreach (cat_sels[c]) begin
+                    do_tx_sel_fast(reg_addrs[r], cat_sels[c]);
+                    do_tx_fast(0, reg_addrs[r]);
+                end
+            end
+
+            // 3. Same-address consecutive hazards (WAW, RAW, RAR, WAR)
+            do_tx_fast(1, 16'hE000);
+            do_tx_fast(1, 16'hE000);
+            do_tx_fast(0, 16'hE000);
+            do_tx_fast(0, 16'hE000);
+            do_tx_fast(1, 16'hE000);
+
+            // 4. Constrained-random stress across full address space
+            repeat (200) begin
+                automatic wb_seq_item item = new();
+                item.cfg.ADDR_WIDTH = ADDR_WIDTH;
+                item.cfg.DATA_WIDTH = DATA_WIDTH;
+                void'(item.randomize());
+                dvr.seq_mbx.put(item);
+                repeat(6) @(posedge clk_i);
+            end
+        end
+
         // wait for all outstanding transactions to complete
         mon.wait_for_idle();
 
         scb.report();
+        cov.report();
         $finish;
     end
 

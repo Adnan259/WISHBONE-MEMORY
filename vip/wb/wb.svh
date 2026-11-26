@@ -9,6 +9,7 @@ package wb_vip_pkg;
     `include "vip/wb/driver.sv"
     `include "vip/wb/monitor.sv"
     `include "vip/wb/scoreboard.sv"
+    `include "vip/wb/coverage.sv"
 
 endpackage
 `endif

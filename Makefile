@@ -58,7 +58,7 @@ endif
 # ------------------------------------------------------------
 # Targets
 # ------------------------------------------------------------
-.PHONY: all run clean help wave_tcl
+.PHONY: all run cov clean help wave_tcl
 
 all: run
 
@@ -72,7 +72,9 @@ run: $(BUILD_DIR)/xsim.dir/$(TOP)/xsimk wave_tcl
 	@echo ""
 	cd $(BUILD_DIR) && $(XSIM) $(TOP) $(XSIM_FLAGS)
 
-$(BUILD_DIR)/xsim.dir/$(TOP)/xsimk: $(ALL_SRCS) | $(BUILD_DIR)
+VIP_DEPS := $(wildcard vip/wb/*.sv)
+
+$(BUILD_DIR)/xsim.dir/$(TOP)/xsimk: $(ALL_SRCS) $(VIP_DEPS) | $(BUILD_DIR)
 	@echo ">>> Compiling sources  →  $(BUILD_DIR)"
 	cd $(BUILD_DIR) && $(XVLOG) $(XVLOG_FLAGS) $(ABS_SRCS)
 	@echo ">>> Elaborating: $(TOP)"
@@ -110,6 +112,11 @@ wave_tcl: | $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+
+cov: run
+	@echo ">>> Generating Vivado XSim HTML coverage report -> $(BUILD_DIR)/cov_report"
+	xcrg -dir $(BUILD_DIR)/xsim.covdb -report_dir $(BUILD_DIR)/cov_report -report_format html
+
 clean:
 	@echo ">>> Removing build/"
 	rm -rf build/
@@ -120,6 +127,7 @@ help:
 	@echo "  ──────────────────────────────────────"
 	@echo "  make        batch mode (default)"
 	@echo "  make GUI=1  Open waveform GUI"
+	@echo "  make cov    Run sim + generate HTML coverage report (xcrg)"
 	@echo "  make clean  Remove build/ folder"
 	@echo "  ──────────────────────────────────────"
 	@echo ""
