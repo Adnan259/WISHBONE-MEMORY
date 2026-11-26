@@ -4,9 +4,11 @@ class wb_monitor #(
 );
     virtual wb_if #(ADDR_WIDTH, DATA_WIDTH) vif;
     mailbox #(wb_rsp_item) rsp_mbx;
+    mailbox #(wb_rsp_item) cov_mbx;
 
     function new();
         rsp_mbx = new();
+        cov_mbx = null;
     endfunction
 
     function void connect_interface(
@@ -17,6 +19,10 @@ class wb_monitor #(
 
     function void connect_mailbox(mailbox #(wb_rsp_item) rsp_mbx);
         this.rsp_mbx = rsp_mbx;
+    endfunction
+
+    function void connect_cov_mailbox(mailbox #(wb_rsp_item) cov_mbx);
+        this.cov_mbx = cov_mbx;
     endfunction
 
     task automatic run();
@@ -39,6 +45,8 @@ class wb_monitor #(
                 $display("[WRITE] addr=0x%04h data=0x%08h sel=%04b",
                           addr, data, sel);
                 rsp_mbx.put(item);
+                if (cov_mbx != null)
+                    cov_mbx.put(item);
             end
 
             forever begin
@@ -57,6 +65,8 @@ class wb_monitor #(
                 $display("[READ ] addr=0x%04h rdata=0x%08h",
                           addr, rdata);
                 rsp_mbx.put(item);
+                if (cov_mbx != null)
+                    cov_mbx.put(item);
             end
         join_none
     endtask
@@ -64,8 +74,10 @@ class wb_monitor #(
     task automatic wait_for_idle(int num_cycles = 10);
         int count = 0;
         while (count < num_cycles) begin
-            if (rsp_mbx.num() == 0) count++;
-            else                    count = 0;
+            if (rsp_mbx.num() == 0 && (cov_mbx == null || cov_mbx.num() == 0))
+                count++;
+            else
+                count = 0;
             @(posedge vif.clk_i);
         end
     endtask
